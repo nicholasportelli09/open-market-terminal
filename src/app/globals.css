@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --bg: #ffffff;
+  --surface: #f6f7f9;
+  --card: #ffffff;
+  --hover: #f1f3f5;
+  --line: #e7e9ec;
+  --line-strong: #d5d9de;
+  --fg: #0c0e12;
+  --muted: #5d6470;
+  --faint: #8b929c;
+  --up: #0a7f43;
+  --down: #d1271b;
+  --up-soft: rgba(10, 127, 67, 0.09);
+  --down-soft: rgba(209, 39, 27, 0.08);
+  --up-flash: rgba(10, 127, 67, 0.18);
+  --down-flash: rgba(209, 39, 27, 0.16);
+  --accent: #f08c00;
+  --focus: #2563eb;
+  --chart-grid: rgba(12, 14, 18, 0.06);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0d10;
+  --surface: #101317;
+  --card: #12151a;
+  --hover: #1a1e24;
+  --line: #20252c;
+  --line-strong: #2c323a;
+  --fg: #eceef1;
+  --muted: #9aa2ad;
+  --faint: #6c747f;
+  --up: #2bc46f;
+  --down: #f2555a;
+  --up-soft: rgba(43, 196, 111, 0.12);
+  --down-soft: rgba(242, 85, 90, 0.12);
+  --up-flash: rgba(43, 196, 111, 0.25);
+  --down-flash: rgba(242, 85, 90, 0.24);
+  --accent: #ffa31a;
+  --focus: #60a5fa;
+  --chart-grid: rgba(236, 238, 241, 0.06);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-up-soft: var(--up-soft);
+  --color-down-soft: var(--down-soft);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes flash-up {
+  from { background-color: var(--up-flash); }
+  to { background-color: transparent; }
+}
+@keyframes flash-down {
+  from { background-color: var(--down-flash); }
+  to { background-color: transparent; }
+}
+.flash-up { animation: flash-up 900ms ease-out; }
+.flash-down { animation: flash-down 900ms ease-out; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.live-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+@keyframes shimmer {
+  from { background-position: -200px 0; }
+  to { background-position: 200px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--hover) 0, var(--line) 60px, var(--hover) 120px) var(--hover);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+
+:root[data-calm="1"] *,
+:root[data-calm="1"] *::before,
+:root[data-calm="1"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* While the account menu is open, the header (and the menu inside it) sits above full-screen overlays such as the
+   Analyst drawer, so "Add your AI key" from inside an overlay shows the form instead of opening it underneath. */
+html[data-account-open] .site-header {
+  z-index: 60;
+}

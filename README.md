@@ -106,3 +106,8 @@ the app.
 ## License
 
 [MIT](LICENSE)
+
+The MIT licence covers this project's own code. Dependencies keep their own licences. The charts use
+[TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/) (Apache 2.0), Copyright (c) 2025
+TradingView, Inc. Its licence requires that notice and a link to <https://www.tradingview.com/> on any site that
+uses it. The app's footer shows both, so keep them if you deploy your own copy.

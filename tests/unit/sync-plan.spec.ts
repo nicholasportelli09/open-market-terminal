@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { allowedUserIds, bearerToken, requireAiUser } from "@/lib/server/auth";
-import { MAX_VALUE_CHARS, type SyncMeta, hashValue, parseMeta, planSync } from "@/lib/sync/plan";
+import { MAX_VALUE_CHARS, type SyncMeta, accountSwitchDone, hashValue, parseMeta, planSync } from "@/lib/sync/plan";
 
 const U = "user-1";
 const P = "terminal.portfolio.v1";
@@ -80,4 +80,15 @@ test("AI sign-in check: bearer parsing, owner allowlist, open when Supabase is n
   expect(allowedUserIds(undefined).size).toBe(0);
   // The unit-test environment has no NEXT_PUBLIC_SUPABASE_* values, so the gate is open (local development).
   expect(await requireAiUser(req())).toBeNull();
+});
+
+test("an account switch is only complete when every old key was moved aside or replaced", () => {
+  const plan = planSync({ [P]: "old-user-portfolio", [W]: "old-list" }, { [W]: { value: "new-list", updatedAt: "t1" } }, meta({}, "user-0"), U);
+  expect(plan.otherAccount).toBe(true);
+  // The stash of the portfolio failed (e.g. storage full): the old user's portfolio is still here.
+  const device = (values: Record<string, string>) => (k: string) => values[k] ?? null;
+  expect(accountSwitchDone(plan, device({ [P]: "old-user-portfolio", [W]: "new-list" }))).toBe(false);
+  // The download did not land.
+  expect(accountSwitchDone(plan, device({ [W]: "old-list" }))).toBe(false);
+  expect(accountSwitchDone(plan, device({ [W]: "new-list" }))).toBe(true);
 });

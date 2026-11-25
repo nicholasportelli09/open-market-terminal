@@ -44,7 +44,7 @@ function useNow(): Date | null {
 
 /**
  * US market status and the New York clock.
- * full: header, with the clock; next-open text where the header has room (lg, 2xl), else in the tooltip.
+ * full: header, with the clock (not at xl, where the inline nav needs the room); next-open text where the header has room (lg, 2xl), else in the tooltip.
  * compact: nav row on tablets, label only (next-open text in the tooltip), no clock.
  */
 export function MarketStatus({ variant = "full", className = "" }: { variant?: "full" | "compact"; className?: string }) {
@@ -64,7 +64,7 @@ export function MarketStatus({ variant = "full", className = "" }: { variant?: "
       {variant === "full" && view?.detail && !feedDown && (
         <span className={`hidden whitespace-nowrap text-faint ${"lg:inline xl:hidden 2xl:inline"}`}>{view.detail}</span>
       )}
-      {variant === "full" && <span className="num whitespace-nowrap text-faint">NY {now ? nyClock(now) : ""}</span>}
+      {variant === "full" && <span className="num whitespace-nowrap text-faint xl:hidden 2xl:inline">NY {now ? nyClock(now) : ""}</span>}
     </div>
   );
 }

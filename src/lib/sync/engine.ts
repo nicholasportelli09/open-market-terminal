@@ -7,13 +7,15 @@
  * - after a download, reloads the page so every screen re-reads storage, but only when that cannot interrupt
  *   anything: on the first pass after sign-in or page load, or while the tab is hidden with no AI request
  *   running. Otherwise it sets `pendingReload` and the account menu offers a Reload button.
- * Replaced local data is kept in backups.ts. One tab at a time runs a pass (Web Locks when available).
+ * Replaced local data is kept in backups.ts. When another account takes over this device, the previous
+ * account's IBKR connection (device-only) is forgotten, so its auto-sync cannot write into the new account. One tab at a time runs a pass (Web Locks when available).
  * Rows are protected by row-level security: a session can only read and write its own user's rows.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { IBKR_STORAGE_KEY } from "@/lib/client/ibkr-connection";
 import { requestsInFlight } from "@/lib/client/inflight";
 import { addBackup } from "./backups";
-import { type RemoteRow, SYNC_KEYS, type SyncKey, type SyncMeta, hashValue, parseMeta, planSync } from "./plan";
+import { type RemoteRow, SYNC_KEYS, type SyncKey, type SyncMeta, accountSwitchDone, hashValue, parseMeta, planSync } from "./plan";
 
 const TABLE = "user_data";
 const META_KEY = "terminal.sync.meta";
@@ -114,11 +116,13 @@ async function syncOnce(sb: SupabaseClient, userId: string, isStopped: () => boo
   const next: SyncMeta = { userId, keys: { ...(meta?.userId === userId ? meta.keys : {}) } };
   for (const s of plan.settled) next.keys[s.key] = { hash: s.hash, remoteAt: s.remoteAt };
 
-  if (plan.upload.length > 0) {
+  // Signed out or switched account while the rows were loading: this device's data may not be this user's.
+  if (plan.upload.length > 0 && !isStopped()) {
     const now = new Date().toISOString();
+    // user_id is sent explicitly, so row-level security rejects the write if the session changed meanwhile.
     const { data: saved, error: upErr } = await sb
       .from(TABLE)
-      .upsert(plan.upload.map((u) => ({ key: u.key, value: u.value, updated_at: now })), { onConflict: "user_id,key" })
+      .upsert(plan.upload.map((u) => ({ user_id: userId, key: u.key, value: u.value, updated_at: now })), { onConflict: "user_id,key" })
       .select("key,updated_at");
     if (upErr) throw new Error(upErr.message);
     for (const row of saved ?? []) {
@@ -155,7 +159,11 @@ async function syncOnce(sb: SupabaseClient, userId: string, isStopped: () => boo
       changedKeys.push(s.key);
     }
   }
-  setItem(META_KEY, JSON.stringify(next));
+  const switched = !plan.otherAccount || (!isStopped() && accountSwitchDone(plan, getItem));
+  if (switched) {
+    if (plan.otherAccount) removeItem(IBKR_STORAGE_KEY);
+    setItem(META_KEY, JSON.stringify(next));
+  }
   return { changedKeys, tooLarge: plan.tooLarge, synced, backupFailed };
 }
 

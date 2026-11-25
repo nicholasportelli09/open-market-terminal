@@ -81,7 +81,7 @@ export function ChartControls(p: ChartControlsProps) {
         ) : (
           <span className="num rounded-md bg-hover px-1.5 py-0.5 font-medium text-muted" title={`Each point is ${INTERVAL_NAMES[p.interval]}`}>{p.interval}</span>
         )}
-        <span className={`hidden truncate ${p.intervalOptions.length > 1 ? "xl:block" : "md:block"}`}>Scroll to zoom · drag to pan · drag the price axis to stretch · double-click to reset</span>
+        <span className={`hidden truncate ${p.intervalOptions.length > 1 ? "xl:block" : "md:block"}`}>Drag to measure · scroll to zoom · Shift-drag to pan · double-click to reset</span>
       </div>
       <div className="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label="Chart navigation">
         <button type="button" className={iconBtn} onClick={p.onZoomOut} aria-label="Zoom out" title="Zoom out (−)">

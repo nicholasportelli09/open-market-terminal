@@ -230,7 +230,7 @@ export function AccountMenu() {
         className={iconBtn}
       >
         <PersonIcon />
-        <span className={signedIn ? "sr-only" : "sr-only md:not-sr-only"}>{label}</span>
+        <span className={signedIn ? "sr-only" : "sr-only md:not-sr-only xl:sr-only 2xl:not-sr-only"}>{label}</span>
         {signedIn && <span className={`h-1.5 w-1.5 rounded-full ${sync.pendingReload || sync.state === "error" ? "bg-down" : "bg-up"}`} aria-hidden />}
       </button>
       {open && (

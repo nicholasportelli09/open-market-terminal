@@ -12,6 +12,13 @@ export function SiteFooter() {
           </a>{" "}
           · MIT licence
         </p>
+        <p>
+          Charts by{" "}
+          <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className="font-medium text-muted underline-offset-2 hover:text-fg hover:underline">
+            TradingView Lightweight Charts™
+          </a>
+          , Copyright (c) 2025 TradingView, Inc. (Apache 2.0)
+        </p>
         <p>Data can be delayed. Not investment advice. Not affiliated with Bloomberg L.P.</p>
       </div>
     </footer>

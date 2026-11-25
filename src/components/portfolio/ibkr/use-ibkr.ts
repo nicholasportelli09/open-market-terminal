@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AUTO_SYNC_AFTER_MS,
+  accountsToSync,
   applyIbkrSnapshot,
   fetchIbkrSnapshot,
   forgetIbkrConnection,
@@ -30,6 +31,8 @@ export type IbkrPhase =
       /** Rows already removed in earlier rounds; every round removes these again plus the new conflicts. */
       dropped: string[];
       creds: { token: string; queryId: string } | null;
+      /** A re-sync of the saved connection (not a first import or a file). */
+      existing: boolean;
     }
   | { s: "done"; message: string; notes: string[] };
 
@@ -90,14 +93,13 @@ export function useIbkr() {
   /** Saves, or moves to the conflict step; on success remembers the connection (token imports only). */
   const finish = useCallback(
     (res: ApplyResult, snapshot: IbkrSnapshot, ids: string[], mode: ApplyMode, creds: { token: string; queryId: string } | null, existing: boolean, dropped: string[] = []) => {
-      if (!res.ok && "conflicts" in res) return setPhase({ s: "conflict", snapshot, ids, mode, conflicts: res.conflicts, dropped, creds });
+      if (!res.ok && "conflicts" in res) return setPhase({ s: "conflict", snapshot, ids, mode, conflicts: res.conflicts, dropped, creds, existing });
       if (!res.ok) return setPhase({ s: "error", message: `Nothing was saved: ${res.message}` });
       const c = getIbkrConnection();
-      if (existing && c) saveIbkrConnection({ ...c, lastSyncAt: new Date().toISOString() });
-      else if (creds) {
-        const all = ids.length === snapshot.accounts.length;
-        saveIbkrConnection({ ...creds, accounts: all ? null : ids, lastSyncAt: new Date().toISOString() });
-      }
+      const lastSyncAt = new Date().toISOString();
+      // The imported account ids are always saved, so a later report that lacks one cannot erase its holdings.
+      if (existing && c) saveIbkrConnection({ ...c, accounts: ids, lastSyncAt });
+      else if (creds) saveIbkrConnection({ ...creds, accounts: ids, allAccounts: ids.length === snapshot.accounts.length, lastSyncAt });
       const done: IbkrPhase = { s: "done", ...summary(snapshot, ids) };
       carried = done;
       setPhase(done);
@@ -117,7 +119,7 @@ export function useIbkr() {
   const resolveConflicts = useCallback(() => {
     if (phase.s !== "conflict") return;
     const drop = [...new Set([...phase.dropped, ...phase.conflicts.map((c) => c.id)])];
-    finish(applyIbkrSnapshot(phase.snapshot, phase.ids, phase.mode, drop), phase.snapshot, phase.ids, phase.mode, phase.creds, phase.creds === null, drop);
+    finish(applyIbkrSnapshot(phase.snapshot, phase.ids, phase.mode, drop), phase.snapshot, phase.ids, phase.mode, phase.creds, phase.existing, drop);
   }, [phase, finish]);
 
   /** Re-reads the report with the saved connection and replaces the imported rows (hand-entered rows stay). */
@@ -126,17 +128,23 @@ export function useIbkr() {
     if (!c) return;
     setPhase({ s: "loading", label: quiet ? "Updating from IBKR..." : "Syncing with IBKR..." });
     const r = await fetchIbkrSnapshot({ token: c.token, queryId: c.queryId });
+    // Disconnected, or another account took over this device, while the report was loading: save nothing.
+    if (getIbkrConnection()?.token !== c.token) return setPhase({ s: "idle" });
     if (!r.ok) return setPhase({ s: "error", message: r.message });
-    const ids = c.accounts ?? r.data.accounts.map((a) => a.id);
+    // Saved before account ids were recorded: show the accounts and let the user confirm, as on first connect.
+    if (c.accounts.length === 0) {
+      return setPhase({ s: "review", snapshot: r.data, selected: r.data.accounts.map((a) => a.id), creds: { token: c.token, queryId: c.queryId } });
+    }
     // Never replace an account's holdings with nothing because it is missing from today's report.
-    const missing = ids.filter((id) => !r.data.accounts.some((a) => a.id === id));
-    if (missing.length > 0 || ids.length === 0) {
+    const pick = accountsToSync(c, r.data.accounts.map((a) => a.id));
+    if (!pick.ok) {
+      const missing = pick.missing;
       return setPhase({
         s: "error",
         message: `Nothing was changed: ${missing.length || "the"} IBKR account${missing.length === 1 ? " you chose is" : "s you chose are"} not in today's report. Check the Flex Query's accounts in IBKR, or disconnect and connect again to choose accounts.`,
       });
     }
-    finish(applyIbkrSnapshot(r.data, ids, "keep_manual"), r.data, ids, "keep_manual", null, true);
+    finish(applyIbkrSnapshot(r.data, pick.ids, "keep_manual"), r.data, pick.ids, "keep_manual", null, true);
   }, [finish]);
 
   useEffect(() => {

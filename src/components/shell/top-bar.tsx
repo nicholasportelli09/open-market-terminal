@@ -23,7 +23,7 @@ export function TopBar() {
         <div className="hidden xl:block">
           <NavLinks layout="inline" />
         </div>
-        <div className="flex min-w-0 flex-1 justify-center">
+        <div className="flex min-w-0 flex-1 justify-center xl:min-w-[260px]">
           <CommandSearch />
         </div>
         <MarketStatus className="hidden lg:flex" />

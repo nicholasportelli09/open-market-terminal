@@ -233,3 +233,13 @@ test("re-sync keeps the first import's createdAt, so same-day hand rows keep the
   const aaplFirst = first.find((t) => t.symbol === "AAPL");
   expect(later.find((t) => t.symbol === "AAPL")?.createdAt).toBe(aaplFirst?.createdAt);
 });
+
+test("re-sync never replaces a saved account that is missing from the report", async () => {
+  const { accountsToSync } = await import("@/lib/client/ibkr-connection");
+  // Every account was chosen; one of them is missing today. Before, this deleted its holdings.
+  expect(accountsToSync({ accounts: ["U1", "U2"], allAccounts: true }, ["U1"])).toEqual({ ok: false, missing: ["U2"] });
+  expect(accountsToSync({ accounts: ["U1", "U2"], allAccounts: true }, ["U1", "U2", "U3"])).toEqual({ ok: true, ids: ["U1", "U2", "U3"] });
+  expect(accountsToSync({ accounts: ["U1"], allAccounts: false }, ["U1", "U2"])).toEqual({ ok: true, ids: ["U1"] });
+  // A connection saved without account ids is never synced blindly.
+  expect(accountsToSync({ accounts: [], allAccounts: true }, ["U1"])).toEqual({ ok: false, missing: [] });
+});

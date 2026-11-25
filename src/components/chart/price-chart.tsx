@@ -13,7 +13,7 @@ import {
   type SeriesType,
   type Time,
 } from "lightweight-charts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFetch } from "@/lib/client/use-fetch";
 import { presetBars } from "@/lib/chart-shared";
 import { fmtPct, fmtPrice, fmtSigned } from "@/lib/format";
@@ -26,8 +26,10 @@ import { INDICATORS, addIndicators, removeIndicators, updateIndicators, type Ind
 import { ChartLegend, type HoverInfo } from "./chart-legend";
 import { IndicatorMenu } from "./indicator-menu";
 import { followLatest, indexShift, isAwayFromLatest, panRange, presetRange, readRange, realtimeRange, setRange, zoomAt, type ViewLayout } from "./chart-nav";
+import { ChartMeasureOverlay } from "./chart-measure-overlay";
 import { asTime, buildSeries } from "./chart-series";
 import { onThemeChange, readChartColors, withAlpha } from "./chart-theme";
+import { useChartMeasure } from "./use-chart-measure";
 
 type Mode = "line" | "candles";
 const MODES = [
@@ -114,7 +116,8 @@ export function PriceChart({ symbol, quote }: { symbol: string; quote?: Quote })
         minBarSpacing: 0.5,
         tickMarkFormatter: (t: Time, type: number) => formatTick(t as number, type, rangeRef.current, builtRef.current?.dayStarts ?? new Set()),
       },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      // A plain mouse drag measures (use-chart-measure); Shift + drag switches panning on for that press.
+      handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: { time: true, price: true }, axisDoubleClickReset: { time: true, price: true } },
       kineticScroll: { mouse: true, touch: true },
       // Long-press crosshair ends when the finger lifts, so vertical swipes scroll the page again.
@@ -154,6 +157,14 @@ export function PriceChart({ symbol, quote }: { symbol: string; quote?: Quote })
   }, [syncAway]);
 
   useEffect(() => setIndicators(loadIndicators()), []);
+
+  const measureBars = useMemo(
+    () => ({ count: () => builtRef.current?.layout.dataCount ?? 0, timeAt: (i: number) => builtRef.current?.bars[i]?.t }),
+    [],
+  );
+  const { drag: measure, cancel: cancelMeasure } = useChartMeasure(containerRef, chartRef, measureBars);
+  // Another symbol, range, chart type or interval is different data: end any measure in progress.
+  useEffect(() => cancelMeasure(), [symbol, range, mode, interval, cancelMeasure]);
 
   const toggleIndicator = (id: IndicatorId) => {
     const next = indicators.includes(id) ? indicators.filter((x) => x !== id) : INDICATORS.map((i) => i.id).filter((x) => x === id || indicators.includes(x));
@@ -426,14 +437,26 @@ export function PriceChart({ symbol, quote }: { symbol: string; quote?: Quote })
             ) : null
           }
         />
-        <div
-          ref={containerRef}
-          tabIndex={0}
-          onKeyDown={onKeyDown}
-          aria-label="Interactive price chart. Scroll or use arrow keys to zoom and pan, 0 to reset."
-          className={`w-full cursor-crosshair rounded-lg outline-offset-2 ${expanded ? "h-[72vh] min-h-[420px]" : "h-[280px] sm:h-[340px]"}`}
-          data-testid="price-chart"
-        />
+        <div className="relative">
+          <div
+            ref={containerRef}
+            tabIndex={0}
+            onKeyDown={onKeyDown}
+            aria-label="Interactive price chart. Drag across it to measure the change between two points. Scroll or use arrow keys to zoom and pan, Shift and drag to pan, 0 to reset."
+            className={`w-full cursor-crosshair rounded-lg outline-offset-2 ${expanded ? "h-[72vh] min-h-[420px]" : "h-[280px] sm:h-[340px]"}`}
+            data-testid="price-chart"
+          />
+          <ChartMeasureOverlay
+            chart={chartRef.current}
+            series={seriesRef.current[0] ?? null}
+            bars={builtRef.current?.bars ?? []}
+            drag={measure}
+            mode={mode}
+            range={range}
+            interval={interval}
+            decimals={decimals}
+          />
+        </div>
         {away && (
           <button
             type="button"

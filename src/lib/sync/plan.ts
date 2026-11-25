@@ -97,6 +97,14 @@ export function planSync(
   return plan;
 }
 
+/**
+ * After an account switch, whether every key of the previous account was moved aside or replaced. Until then the
+ * device's data still belongs to the previous account, and recording the new owner would upload it there.
+ */
+export function accountSwitchDone(plan: SyncPlan, read: (key: SyncKey) => string | null): boolean {
+  return plan.stash.every((s) => read(s.key) === null) && plan.download.every((d) => read(d.key) === d.value);
+}
+
 export function parseMeta(raw: string | null): SyncMeta | null {
   if (!raw) return null;
   try {

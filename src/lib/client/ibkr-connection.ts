@@ -26,12 +26,16 @@ import { postApi } from "./use-api";
 export type IbkrConnection = {
   token: string;
   queryId: string;
-  /** Account ids to import; null means every account in the report. */
-  accounts: string[] | null;
+  /** Accounts imported at the last confirmed import or sync; each must be in the next report before anything is replaced. */
+  accounts: string[];
+  /** Also import accounts that first appear in a later report. */
+  allAccounts: boolean;
   lastSyncAt: string | null;
 };
 
-const STORAGE_KEY = "terminal.ibkr.v1";
+/** Device-only; the sync engine forgets it when another account takes over this device. */
+export const IBKR_STORAGE_KEY = "terminal.ibkr.v1";
+const STORAGE_KEY = IBKR_STORAGE_KEY;
 /** Flex reports update once per business day; sync on open when the last sync is older than this. */
 export const AUTO_SYNC_AFTER_MS = 6 * 60 * 60_000;
 
@@ -51,8 +55,10 @@ function parse(raw: string | null): IbkrConnection | null {
   try {
     const v = JSON.parse(raw) as Partial<IbkrConnection>;
     if (typeof v.token !== "string" || typeof v.queryId !== "string") return null;
-    const accounts = Array.isArray(v.accounts) ? v.accounts.filter((a): a is string => typeof a === "string") : null;
-    return { token: v.token, queryId: v.queryId, accounts, lastSyncAt: typeof v.lastSyncAt === "string" ? v.lastSyncAt : null };
+    const accounts = Array.isArray(v.accounts) ? v.accounts.filter((a): a is string => typeof a === "string") : [];
+    // Saved before accounts were always listed: null meant every account.
+    const allAccounts = v.allAccounts === true || v.accounts === null;
+    return { token: v.token, queryId: v.queryId, accounts, allAccounts, lastSyncAt: typeof v.lastSyncAt === "string" ? v.lastSyncAt : null };
   } catch {
     return null;
   }
@@ -100,6 +106,17 @@ function subscribe(fn: () => void): () => void {
 
 export function useIbkrConnection(): IbkrConnection | null {
   return useSyncExternalStore(subscribe, getIbkrConnection, () => null);
+}
+
+export type SyncAccounts = { ok: true; ids: string[] } | { ok: false; missing: string[] };
+
+/** The accounts a re-sync replaces. Fails when a saved account is missing from the report (nothing is replaced then). */
+export function accountsToSync(c: Pick<IbkrConnection, "accounts" | "allAccounts">, reported: readonly string[]): SyncAccounts {
+  // No saved accounts (a connection saved before they were recorded): the caller asks the user to confirm instead.
+  if (c.accounts.length === 0) return { ok: false, missing: [] };
+  const ids = c.allAccounts ? [...new Set([...c.accounts, ...reported])] : [...c.accounts];
+  const missing = ids.filter((id) => !reported.includes(id));
+  return missing.length > 0 ? { ok: false, missing } : { ok: true, ids };
 }
 
 /** Reads the report live (token + Query ID) or from an uploaded Flex XML file. */
